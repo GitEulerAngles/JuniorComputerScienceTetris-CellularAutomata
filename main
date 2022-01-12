@@ -1,0 +1,463 @@
+//---------------------Automata---------------------
+var generation = [];
+//x,y,direction
+//0 = conway
+//1 = predator
+//2 = langton
+var ants = [];
+var size = [10,10];
+var boxes = ['⬛','⬜','🟫','🟥'];
+var automataType = 1;
+//Weird functions that help with cellular automata
+function inbounds(x,y){
+  if (x < 0 || y < 0)
+    return false;
+  if (x >= size[0] || y >= size[1])
+    return false;
+  return true;
+}
+function getVectorFromText(text){
+  var coords = [0,0], n = '';
+  for (var i = 0; i < text.length; i++){
+    if (text[i] == ','){
+      coords[0] = Number(n);
+      n = '';
+      continue;
+    }
+    n += text[i];
+  }
+  coords[1] = Number(n);
+  return coords;
+}
+function copy(arr){
+  var newarr = [];
+  for (var y = 0; y < arr.length; y++){
+    appendItem(newarr, []);
+    for (var x = 0; x < arr[y].length; x++)
+      appendItem(newarr[y], arr[y][x]);
+  }
+  return newarr;
+}
+function equal(arr1,arr2){
+  for (var y = 0; y < size[1]; y++)
+  for (var x = 0; x < size[0]; x++){
+    if (arr1[y][x] != arr2[y][x])
+      return false;
+  }
+  return true;
+}
+//Sets up automata
+function automataSetup(fontSize){
+  setProperty("text_area1","font-size",fontSize);
+  generation = [];
+  ants = [];
+  for (var y = 0; y < size[1]; y++){
+    appendItem(generation, []);
+    for (var x = 0; x < size[0]; x++)
+      switch(automataType){
+        case 0:
+        case 2:
+          appendItem(generation[y], 0);
+          break;
+        case 1:
+          appendItem(generation[y], 2);
+          break;
+      }
+  }
+}
+//Cellular automata
+function conway(){
+  var newgen = copy(generation);
+  //Cells
+  for (var y = 0; y < size[1]; y++)
+  for (var x = 0; x < size[0]; x++){
+    var neighborCount = 0;
+    //Neighbors
+    for (var ny = -1; ny <= 1; ny++)
+    for (var nx = -1; nx <= 1; nx++){
+      if (nx == 0 && ny == 0)
+        continue;
+      if (!inbounds(x+nx, y+ny))
+        continue;
+      if (generation[y+ny][x+nx] == 1)
+        neighborCount++;
+    }
+    if (neighborCount < 2 || neighborCount > 3)
+      newgen[y][x] = 0;
+    else if (neighborCount == 3 && generation[y][x] == 0)
+      newgen[y][x] = 1;
+  }
+  if (equal(newgen, generation))
+    return false;
+  generation = newgen;
+  return true;
+}
+function predator(){
+  var newgen = copy(generation);
+  //Cells
+  for (var y = 0; y < size[1]; y++)
+  for (var x = 0; x < size[0]; x++){
+    var reproduced = false;
+    if (randomNumber(1,25) == 1)
+      newgen[y][x] = 1;
+    if (generation[y][x] == 1)
+      continue;
+    //Neighbors
+    for (var ny = -1; ny <= 1; ny++)
+    for (var nx = -1; nx <= 1; nx++){
+      if (nx == 0 && ny == 0)
+        continue;
+      if (!inbounds(x+nx,y+ny))
+        continue;
+      if (generation[y][x] == 2 && generation[y+ny][x+nx] == 1)
+        newgen[y+ny][x+nx] = 2;
+      else if (generation[y][x] == 3 && generation[y+ny][x+nx] == 2){
+        reproduced = true;
+        newgen[y+ny][x+nx] = 3;
+      }
+    }
+    if (!reproduced && generation[y][x] == 3)
+      newgen[y][x] = 1;
+  }
+  if (equal(newgen, generation))
+    return false;
+  generation = newgen;
+  return true;
+}
+function langton(){
+  for (var a = 0; a < ants.length; a++){
+    var current_ant = ants[a];
+    if (generation[current_ant[1]][current_ant[0]] == 0){
+      generation[current_ant[1]][current_ant[0]] = 1;
+      current_ant[2]++;
+    }
+    else {
+      generation[current_ant[1]][current_ant[0]] = 0;
+      current_ant[2]--;
+    }
+    if (current_ant[2] > 3)
+      current_ant[2] = 0;
+    else if (current_ant[2] < 0)
+      current_ant[2] = 3;
+    switch (current_ant[2]){
+      case 0:
+        if (current_ant[0] <= 0)
+          current_ant[0] = size[0] - 1;
+        else
+          current_ant[0]--;
+        break;
+      case 2:
+        if (current_ant[0] >= size[0] - 1)
+          current_ant[0] = 0;
+        else
+          current_ant[0]++;
+        break;
+      case 3:
+        if (current_ant[1] <= 0)
+          current_ant[1] = size[1] - 1;
+        else
+          current_ant[1]--;
+        break;
+      case 1:
+        if (current_ant[1] >= size[1] - 1)
+          current_ant[1] = 0;
+        else
+          current_ant[1]++;
+        break;
+    }
+  }
+}
+//Draws the generation array to the screen using another array called 'boxes'
+function draw(){
+  var oneText = "";
+  for (var y = 0; y < size[1]; y++){
+    for (var x = 0; x < size[0];x++)
+      oneText += boxes[generation[y][x]];
+    oneText += '\n';
+  }
+  setText("text_area1",oneText);
+}
+onEvent("chooserID","change",function(){
+  var text = getText("chooserID");
+  switch (text){
+    case "Game of Life":
+      automataType = 0;
+      break;
+    case "Predator":
+      automataType = 1;
+      break;
+    case "Langton":
+      automataType = 2;
+      break;
+  }
+  setScreen("automata");
+  setProperty("scoreID","hidden",true);
+  setProperty("nextID","hidden",false);
+  setProperty("coordsID","hidden",false);
+  setProperty("numberID","hidden",false);
+  setProperty("randomizeID","hidden",false);
+  automataSetup((320/size[0])*(8/11));
+  draw();
+});
+onEvent("nextID","click",function(){
+  var n = getNumber("numberID");
+  var run = true;
+  for (var i = 0; i < n; i++){
+    switch(automataType){
+      case 0:
+        run = conway();
+        break;
+      case 1:
+        run = predator();
+        break;
+      case 2:
+        langton();
+        break;
+    }
+    if (!run)
+      break;
+    draw();
+  }
+});
+onEvent("randomizeID","click",function(){
+  for (var i = 0; i < (size[0]*size[1])/5; i++){
+    var rx = randomNumber(0, size[0]-1);
+    var ry = randomNumber(0, size[1]-1);
+    switch(automataType){
+      case 0:
+        generation[ry][rx] = 1;
+        break;
+      case 1:
+        generation[ry][rx] = 3;
+        break;
+      case 2:
+        appendItem(ants, [rx,ry,3]);
+        break;
+    }
+  }
+  draw();
+});
+onEvent("coordsID","change",function(){
+  var coords = getVectorFromText(getText("coordsID"));
+  if (!inbounds(coords[0], coords[1]))
+    return;
+  switch(automataType){
+    case 0:
+      generation[coords[1]][coords[0]] = 1;
+      break;
+    case 1:
+      generation[coords[1]][coords[0]] = 3;
+      break;
+    case 2:
+      appendItem(ants, [coords[0], coords[1],1]);
+      break;
+    }
+  draw();
+});
+onEvent("sizeID","change",function(){
+  size = getVectorFromText(getText("sizeID"));
+});
+//----------------------Tetris----------------------
+var Pieces = [
+    [[0,0,0,0],
+     [1,1,1,1],
+     [0,0,0,0],
+     [0,0,0,0]],
+     
+    [[0,0,0,0],
+     [0,1,1,0],
+     [0,1,1,0],
+     [0,0,0,0]],
+     
+    [[0,1,0],
+     [0,1,0],
+     [0,1,1]],
+     
+    [[0,1,0],
+     [0,1,0],
+     [1,1,0]],
+     
+    [[1,0,0],
+     [1,1,0],
+     [0,1,0]],
+     
+    [[0,0,1],
+     [0,1,1],
+     [0,1,0]],
+     
+    [[0,0,0],
+     [1,1,1],
+     [0,1,0]]
+    ];
+var current_piece;
+var coordinates;
+var score;
+var isTetrisOn = false;
+//Rotates the tetris pieces
+function superRotationSystem(current_piece,r){
+  var newpiece = copy(current_piece);
+  var rotate = [
+    [
+      [[2, 0],[ 1, 1],[ 0, 2]],
+      [[1,-1],[ 0, 0],[-1, 1]],
+      [[0,-2],[-1,-1],[-2, 0]]  
+    ],
+    [
+      [[3, 0],[ 2, 1],[ 1, 2],[ 0, 3]],
+      [[2,-1],[ 1, 0],[ 0, 1],[-1, 2]],
+      [[1,-2],[ 0,-1],[-1, 0],[-2, 1]],
+      [[0,-3],[-1,-2],[-2,-1],[-3, 0]]
+    ]
+  ];
+  for (var i = 0; i < r; i++)
+  for (var y = 0; y < current_piece.length; y++)
+  for (var x = 0; x < current_piece[y].length; x++)
+    newpiece[y][x] = current_piece[y+rotate[current_piece.length-3][y][x][1]][x+rotate[current_piece.length-3][y][x][0]];
+  coordinates[2] = 0;
+  return newpiece;
+}
+//Checks if the pieces are inside another piece
+function checkIfColliding(current_piece,preferredx,preferredy,preferredr){
+  var copyPiece = copy(current_piece);
+  copyPiece = superRotationSystem(current_piece,coordinates[2]+preferredr);
+  for (var y = 0; y < current_piece.length; y++)
+  for (var x = 0; x < current_piece[y].length; x++){
+    if (copyPiece[y][x] != 1)
+      continue;
+    if (!inbounds(x+preferredx+coordinates[0],y+preferredy+coordinates[1]))
+      return false;
+    if(generation[y+preferredy+coordinates[1]][x+preferredx+coordinates[0]] == 1)
+      return false;
+  }
+  return true;
+}
+//Spawns a new piece
+function newPiece(){
+  score++;
+  setText("scoreID", "Score: "+score);
+  coordinates = [3,0,0];
+  current_piece = Pieces[randomNumber(0,Pieces.length-1)];
+  if (!checkIfColliding(current_piece,0,0,0))
+    tetrisSetup();
+}
+//Brings the blocks down when a row is found
+function bringDown(starty){
+  score += 10;
+  setText("scoreID", "Score: "+score);
+  for (var y = starty; y > 0; y--)
+  for (var x = 0; x < size[0]; x++){
+    generation[y][x] = generation[y-1][x];
+  }
+}
+function clearRows(){
+  for (var y = 0; y < size[1]; y++){
+    var row = 0;
+    for (var x = 0; x < size[0]; x++)
+      if (generation[y][x] == 1)
+        row++;
+    if (row == size[0])
+      bringDown(y);
+  }
+}
+//When a brick i
+function cementPiece(current_piece,lowesty){
+  for (var y = 0; y < current_piece.length; y++)
+  for (var x = 0; x < current_piece[y].length; x++)
+    if (current_piece[y][x] == 1)
+      generation[y+lowesty][x+coordinates[0]] = 1;
+  clearRows();
+  newPiece();
+}
+function checkIfInGame(current_piece){
+  for (var y = 0; y < current_piece.length; y++)
+  for (var x = 0; x < current_piece[y].length; x++){
+    if (current_piece[y][x] == 1){
+      if (coordinates[0]+x < 0)
+        coordinates[0] += Math.abs(coordinates[0]+x);
+      if (coordinates[0]+x >= size[0])
+        coordinates[0] -= (coordinates[0]-size[0])+x+1;
+      if (coordinates[1]+y > size[1]-1){
+        var lowesty;
+        for (var y = 0; y < current_piece.length; y++)
+        for (var x = 0; x < current_piece[y].length; x++)
+          if (current_piece[y][x] == 1)
+            lowesty = y;
+        cementPiece(current_piece,size[1]-lowesty-1);
+        return;
+      }
+    }
+  }
+}
+function tetris(){
+  newPiece();
+  timedLoop(0,function(){
+    if (!isTetrisOn)
+      stopTimedLoop();
+    for (var y = 0; y < size[1]; y++)
+    for (var x = 0; x < size[0]; x++){
+      var square = generation[y][x];
+      if (square == 3)
+        generation[y][x] = 0;
+    }
+    checkIfInGame(current_piece);
+    current_piece = superRotationSystem(current_piece, coordinates[2]);
+    for (var y = 0; y < current_piece.length; y++)
+    for (var x = 0; x < current_piece[y].length; x++){
+      if (current_piece[y][x] == 1 )
+        generation[y+coordinates[1]][x+coordinates[0]] = 3;
+    }
+    draw();
+  });
+  timedLoop(500,function(){
+    if (!isTetrisOn)
+      stopTimedLoop();
+    if (checkIfColliding(current_piece, 0, 1, 0))
+      coordinates[1] += 1;
+    else
+      cementPiece(current_piece,coordinates[1]);
+  });
+}
+function tetrisSetup(){
+  isTetrisOn = true;
+  score = 0;
+  size[0] = 10;
+  size[1] = 20;
+  automataType = 2;
+  setProperty("scoreID","hidden",false);
+  setProperty("nextID","hidden",true);
+  setProperty("coordsID","hidden",true);
+  setProperty("numberID","hidden",true);
+  setProperty("randomizeID","hidden",true);
+  setScreen("automata");
+  automataSetup(14);
+}
+onEvent("tetrisID","click",function(){
+  tetrisSetup();
+  tetris();
+});
+onEvent("automata","keyup",function(event){
+  if (!isTetrisOn)
+    return;
+  if (event.key == "Right"){
+    if (checkIfColliding(current_piece, 1, 0, 0))
+      coordinates[0] += 1;
+  }
+  if (event.key == "Left"){
+    if (checkIfColliding(current_piece, -1, 0, 0))
+      coordinates[0] -= 1;
+  }
+  if (event.key == "Down"){
+    if (checkIfColliding(current_piece, 0, 1, 0))
+      coordinates[1] += 1;
+    else
+      cementPiece(current_piece,coordinates[1]);
+  }
+  if (event.key == "Up"){
+    if (checkIfColliding(current_piece, 0, 0, 1))
+      coordinates[2] += 1;
+  }
+});
+onEvent("backID","click",function(){
+  isTetrisOn = false;
+  setScreen("main");
+});
